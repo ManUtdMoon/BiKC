@@ -1,0 +1,38 @@
+name: keypose_aloha_conveyor
+
+dataset_dir: &dataset_dir data/aloha/datasets/aloha_conveyor
+dataset_target: &dataset_target diffusion_policy.dataset.keypose_aloha_multi_image_dataset.KeyposeAlohaMultiImageDataset
+
+image_shape: &image_shape [3, 120, 160]
+shape_meta: &shape_meta
+  # acceptable types: rgb, low_dim
+  obs:
+    cam_high:
+      shape: *image_shape
+      type: rgb
+    cam_low:
+      shape: *image_shape
+      type: rgb
+    cam_left_wrist:
+      shape: *image_shape
+      type: rgb
+    cam_right_wrist:
+      shape: *image_shape
+      type: rgb
+    qpos:
+      shape: [14]
+      type: low_dim
+    last_keypose:
+      shape: [14]
+      type: low_dim
+  next_keypose:
+    shape: [14]
+
+dataset:
+  _target_: *dataset_target
+  dataset_dir: *dataset_dir
+  shape_meta: *shape_meta
+  seed: 42
+  val_ratio: 0.1
+  task: aloha_conveyor
+  use_cache: False

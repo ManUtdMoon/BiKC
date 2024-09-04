@@ -1,0 +1,41 @@
+name: trajectory_aloha_conveyor
+
+dataset_dir: &dataset_dir data/aloha/datasets/aloha_conveyor
+dataset_target: &dataset_target diffusion_policy.dataset.trajectory_aloha_multi_image_dataset.TrajectoryAlohaMultiImageDataset
+
+image_shape: &image_shape [3, 120, 160]
+shape_meta: &shape_meta
+  # acceptable types: rgb, low_dim
+  obs:
+    cam_high:
+      shape: *image_shape
+      type: rgb
+    cam_low:
+      shape: *image_shape
+      type: rgb
+    cam_left_wrist:
+      shape: *image_shape
+      type: rgb
+    cam_right_wrist:
+      shape: *image_shape
+      type: rgb
+    qpos:
+      shape: [14]
+      type: low_dim
+  next_keypose:
+    shape: [14]
+  action:
+    shape: [14]
+
+dataset:
+  _target_: *dataset_target
+  dataset_dir: *dataset_dir
+  shape_meta: *shape_meta
+  seed: 42
+  val_ratio: 0.1
+  task: aloha_conveyor
+  horizon: ${horizon}
+  pad_before: ${eval:'${n_obs_steps}-1+${n_latency_steps}'}
+  pad_after: ${eval:'${n_action_steps}-1'}
+  n_obs_steps: ${dataset_obs_steps}
+  use_cache: False

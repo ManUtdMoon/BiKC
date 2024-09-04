@@ -1,0 +1,42 @@
+name: &name aloha_ziploc
+dataset_dir: &dataset_dir data/aloha/datasets/aloha_ziploc
+
+## version.1 - multi-view observation are independently encoded
+dataset_target: &dataset_target diffusion_policy.dataset.aloha_multi_image_dataset.AlohaMultiImageDataset
+image_shape: &image_shape [3, 120, 160] 
+shape_meta: &shape_meta
+  # acceptable types: rgb, low_dim
+  obs:
+    cam_high:
+      shape: *image_shape
+      type: rgb
+    cam_low:
+      shape: *image_shape
+      type: rgb
+    cam_left_wrist:
+      shape: *image_shape
+      type: rgb
+    cam_right_wrist:
+      shape: *image_shape
+      type: rgb
+    qpos:
+      shape: [14]
+      type: low_dim
+  action:
+    shape: [14]
+
+dataset:
+  _target_: *dataset_target
+  shape_meta: *shape_meta
+  dataset_dir: *dataset_dir
+  horizon: ${horizon}
+  pad_before: ${eval:'${n_obs_steps}-1+${n_latency_steps}'}
+  pad_after: ${eval:'${n_action_steps}-1'}
+  n_obs_steps: ${dataset_obs_steps}
+  use_cache: False
+  seed: 42
+  val_ratio: 0.2
+  max_train_episodes: null
+  camera_names: ["cam_high", "cam_low", "cam_left_wrist", "cam_right_wrist"]
+  task: *name
+  num_episodes: 43

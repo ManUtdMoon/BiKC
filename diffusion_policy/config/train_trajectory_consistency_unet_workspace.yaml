@@ -1,0 +1,177 @@
+defaults:
+  - _self_
+  - task: trajectory_aloha_screwdriver
+
+name: train_trajectory_consistency_unet
+_target_: diffusion_policy.workspace.train_trajectory_consistency_unet_workspace.TrainTrajectoryConsistencyUnetWorkspace
+
+task_name: ${task.name}
+shape_meta: ${task.shape_meta}
+exp_name: "default"
+
+horizon: 16
+n_obs_steps: 2
+n_action_steps: 8
+n_latency_steps: 0
+dataset_obs_steps: ${n_obs_steps}
+past_action_visible: False
+keypoint_visible_rate: 1.0
+obs_as_global_cond: True
+
+policy:
+  _target_: diffusion_policy.policy.trajectory_consistency_unet_policy.TrajectoryConsistencyUnetPolicy
+
+  shape_meta: ${shape_meta}  
+
+  noise_scheduler:
+    sigma_data: 0.5
+    sigma_max: 80.0
+    sigma_min: 0.002
+    distillation: False
+    weight_schedule: "inv_delta_sigma"
+    schedule_sampler: "uniform"
+    noise_schedule: "uniform"
+    loss_norm: "pseudo_huber"
+
+  ## config for consistency training
+  ema_scale:
+    teacher_model_path: ""
+    teacher_dropout: 0.1
+    training_mode: "consistency_training"
+    target_ema_mode: "zero"
+    scale_mode: "step"
+    total_training_steps: 550000
+    start_ema: 0.9
+    start_scales: 10
+    end_scales: 160
+    distill_steps_per_iter: 50000
+
+  sample:
+    sampler: "onestep"
+    generator: None
+    ts: ""
+    clip_denoised: True
+    s_churn: 0.0
+    s_tmin: 0.0
+    s_tmax: "inf"
+    s_noise: 1.0
+    steps: 40
+
+  ## config for observation encoder
+  obs_encoder:
+    _target_: diffusion_policy.model.vision.multi_image_obs_encoder.MultiImageObsEncoder
+    shape_meta: ${shape_meta}
+    rgb_model:
+      _target_: diffusion_policy.model.vision.model_getter.get_resnet
+      name: resnet18
+      weights: null
+    resize_shape: null ## for aloha_image_dataset_multi, [480, 640] / 4 * 0.6
+    crop_shape: [110, 150] ## for aloha_image_dataset_multi
+    # resize_shape: [240, 80] ## for aloha_image_dataset_concat, [1920, 640] / 8
+    # crop_shape: null ## for aloha_image_dataset_concat
+    # constant center crop
+    random_crop: True
+    use_group_norm: True
+    share_rgb_model: False
+    imagenet_norm: True
+
+  horizon: ${horizon}
+  n_action_steps: ${eval:'${n_action_steps}+${n_latency_steps}'}
+  n_obs_steps: ${n_obs_steps}
+  num_inference_steps: 1
+  obs_as_global_cond: ${obs_as_global_cond}
+  diffusion_step_embed_dim: 128
+  goal_embed_dim: 128
+  down_dims: [256,512,1024]
+  kernel_size: 5
+  n_groups: 8
+  cond_predict_scale: True
+
+  # scheduler.step params
+  # predict_epsilon: True
+
+ema:
+  _target_: diffusion_policy.model.diffusion.ema_model.EMAModel
+  update_after_step: 0
+  inv_gamma: 1.0
+  power: 0.75
+  min_value: 0.0
+  max_value: 0.9999
+
+dataloader:
+  batch_size: 64
+  num_workers: 8
+  shuffle: True
+  pin_memory: True
+  persistent_workers: True
+
+val_dataloader:
+  batch_size: 64
+  num_workers: 8
+  shuffle: False
+  pin_memory: True
+  persistent_workers: False
+
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 1.0e-4
+  betas: [0.95, 0.999]
+  eps: 1.0e-8
+  weight_decay: 1.0e-6
+
+training:
+  device: "cuda:0"
+  seed: 42
+  debug: False
+  resume: True
+  # optimization
+  lr_scheduler: cosine
+  lr_warmup_steps: 1000
+  num_epochs: 1005
+  gradient_accumulate_every: 1
+  # EMA destroys performance when used with BatchNorm
+  # replace BatchNorm with GroupNorm.
+  use_ema: False
+  freeze_encoder: False
+  # training loop control
+  # in epochs
+  rollout_every: 25
+  checkpoint_every: 25
+  val_every: 25
+  sample_every: 25
+  # steps per epoch
+  max_train_steps: null
+  max_val_steps: null
+  # misc
+  tqdm_interval_sec: 1.0
+
+logging:
+  project: trajectory_aloha_real
+  resume: True
+  mode: online
+  name: ${now:%Y.%m.%d-%H.%M.%S}_${name}_${task_name}
+  tags: ["${name}", "${task_name}", "${exp_name}"]
+  id: null
+  group: null
+
+checkpoint:
+  topk:
+    monitor_key: train_action_mse_error
+    mode: min
+    k: 5
+    format_str: 'epoch={epoch:04d}-train_action_mse_error={train_action_mse_error:.5f}.ckpt'
+  save_last_ckpt: True
+  save_last_snapshot: False
+
+multi_run:
+  run_dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+  wandb_name_base: ${now:%Y.%m.%d-%H.%M.%S}_${name}_${task_name}
+
+hydra:
+  job:
+    override_dirname: ${name}
+  run:
+    dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+  sweep:
+    dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+    subdir: ${hydra.job.num}

@@ -1,0 +1,106 @@
+defaults:
+  - _self_
+  - task: keypose_sim_transfer_cube_scripted
+
+name: train_keypose_transformer_ddp
+_target_: diffusion_policy.workspace.train_keypose_transformer_workspace_ddp.TrainKeyposeTransformerWorkspaceDDP
+
+task_name: ${task.name}
+shape_meta: ${task.shape_meta}
+exp_name: "default"
+
+d_emb: 256
+
+policy:
+  _target_: diffusion_policy.policy.keypose_transformer_policy.KeyposeTransformerPolicy
+
+  shape_meta: ${shape_meta}
+
+  obs_encoder:
+    _target_: diffusion_policy.model.vision.dict_image_obs_encoder.DictImageObsEncoder
+    shape_meta: ${shape_meta}
+    rgb_model:
+      _target_: diffusion_policy.model.vision.model_getter.get_resnet
+      name: resnet18
+      weights: null
+    resize_shape: [240, 320]
+    crop_shape: [220, 300]
+    # constant center crop
+    random_crop: True
+    use_group_norm: True
+    share_rgb_model: False
+    imagenet_norm: False
+    cnn_out_layer: "layer4"
+    embedding_dim: ${d_emb}
+
+  n_layer: 4
+  n_head: 4
+  d_embedding: ${d_emb}
+  p_drop: 0.1
+
+dataloader:
+  batch_size: 16
+  num_workers: 4
+  pin_memory: True
+  drop_last: False
+  persistent_workers: True
+  prefetch_factor: 8
+
+val_dataloader:
+  batch_size: 16
+  num_workers: 4
+  pin_memory: True
+  persistent_workers: False
+
+optimizer:
+  transformer_weight_decay: 1.0e-3
+  obs_encoder_weight_decay: 1.0e-6
+  learning_rate: 1.0e-4
+  betas: [0.9, 0.95]
+
+training:
+  device: "cuda"
+  seed: 42
+  debug: False
+  resume: True
+  # optimization
+  lr_scheduler: cosine
+  lr_warmup_steps: 500
+  num_epochs: 505
+  freeze_encoder: False
+  # training loop control
+  # in epochs
+  checkpoint_every: 50
+  val_every: 50
+  # steps per epoch
+  max_train_steps: null
+  max_val_steps: null
+  # misc
+  tqdm_interval_sec: 1.0
+
+logging:
+  project: keypose
+  resume: True
+  mode: online
+  name: ${now:%Y.%m.%d-%H.%M.%S}_${name}_${task_name}
+  tags: ["${name}", "${task_name}", "${exp_name}"]
+  id: null
+  group: null
+
+checkpoint:
+  topk:
+    monitor_key: log_val_loss
+    mode: min
+    k: 5
+    format_str: 'epoch={epoch:04d}-log_val_loss={log_val_loss:.3f}.ckpt'
+  save_last_ckpt: True
+  save_last_snapshot: False
+
+hydra:
+  job:
+    override_dirname: ${name}
+  run:
+    dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+  sweep:
+    dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+    subdir: ${hydra.job.num}

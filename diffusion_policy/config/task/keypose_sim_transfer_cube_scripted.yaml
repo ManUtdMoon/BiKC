@@ -1,0 +1,26 @@
+name: keypose_sim_transfer_cube_scripted
+
+image_shape: &image_shape [3, 240, 320]
+shape_meta: &shape_meta
+  # acceptable types: rgb, low_dim
+  obs:
+    images:
+      shape: *image_shape
+      type: rgb
+    qpos:
+      shape: [14]
+      type: low_dim
+    last_keypose:
+      shape: [14]
+      type: low_dim
+  next_keypose:
+    shape: [14]
+
+dataset:
+  _target_: diffusion_policy.dataset.keypose_aloha_dataset.KeyposeAlohaDataset
+  dataset_dir: data/aloha/datasets/
+  shape_meta: *shape_meta
+  seed: 42
+  val_ratio: 0.1
+  task: sim_transfer_cube_scripted
+  use_cache: False

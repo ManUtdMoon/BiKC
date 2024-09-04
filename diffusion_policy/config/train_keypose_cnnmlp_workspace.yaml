@@ -1,0 +1,107 @@
+defaults:
+  - _self_
+  - task: keypose_sim_transfer_cube_scripted
+
+name: train_keypose_cnnmlp
+_target_: diffusion_policy.workspace.train_keypose_cnnmlp_workspace.TrainKeyposeCNNMLPWorkspace
+
+task_name: ${task.name}
+shape_meta: ${task.shape_meta}
+exp_name: "default"
+
+policy:
+  _target_: diffusion_policy.policy.keypose_cnnmlp_policy.KeyposeCNNMLPPolicy
+
+  shape_meta: ${shape_meta}
+
+  obs_encoder:
+    _target_: diffusion_policy.model.vision.multi_image_obs_encoder.MultiImageObsEncoder
+    shape_meta: ${shape_meta}
+    rgb_model:
+      _target_: diffusion_policy.model.vision.model_getter.get_resnet
+      name: resnet18
+      weights: null
+    resize_shape: [240, 320]
+    crop_shape: [220, 300]
+    # constant center crop
+    random_crop: True
+    use_group_norm: True
+    share_rgb_model: False
+    imagenet_norm: False
+
+  hidden_depth: 2
+  hidden_dim: 1024
+
+dataloader:
+  batch_size: 64
+  num_workers: 16
+  shuffle: True
+  pin_memory: True
+  persistent_workers: True
+  prefetch_factor: 8
+
+val_dataloader:
+  batch_size: 64
+  num_workers: 16
+  shuffle: False
+  pin_memory: True
+  persistent_workers: False
+
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 1.0e-4
+  betas: [0.95, 0.999]
+  eps: 1.0e-8
+  weight_decay: 1.0e-6
+
+training:
+  device: "cuda:0"
+  seed: 42
+  debug: False
+  resume: True
+  # optimization
+  lr_scheduler: cosine
+  lr_warmup_steps: 500
+  num_epochs: 505
+  gradient_accumulate_every: 1
+  freeze_encoder: False
+  # training loop control
+  # in epochs
+  checkpoint_every: 50
+  val_every: 50
+  # steps per epoch
+  max_train_steps: null
+  max_val_steps: null
+  # misc
+  tqdm_interval_sec: 1.0
+
+logging:
+  project: keypose
+  resume: True
+  mode: online
+  name: ${now:%Y.%m.%d-%H.%M.%S}_${name}_${task_name}
+  tags: ["${name}", "${task_name}", "${exp_name}"]
+  id: null
+  group: null
+
+checkpoint:
+  topk:
+    monitor_key: log_val_loss
+    mode: min
+    k: 5
+    format_str: 'epoch={epoch:04d}-log_val_loss={log_val_loss:.3f}.ckpt'
+  save_last_ckpt: True
+  save_last_snapshot: False
+
+multi_run:
+  run_dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+  wandb_name_base: ${now:%Y.%m.%d-%H.%M.%S}_${name}_${task_name}
+
+hydra:
+  job:
+    override_dirname: ${name}
+  run:
+    dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+  sweep:
+    dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+    subdir: ${hydra.job.num}

@@ -1,0 +1,58 @@
+name: &name aloha_towel
+dataset_dir: &dataset_dir data/aloha/datasets/aloha_towel
+
+## version.1 - multi-view observation are independently encoded
+dataset_target: &dataset_target diffusion_policy.dataset.aloha_image_dataset_multi.AlohaImageDataset
+image_shape: &image_shape [3, 240, 320] 
+shape_meta: &shape_meta
+  # acceptable types: rgb, low_dim
+  obs:
+    cam_high:
+      shape: *image_shape
+      type: rgb
+    cam_low:
+      shape: *image_shape
+      type: rgb
+    cam_left_wrist:
+      shape: *image_shape
+      type: rgb
+    cam_right_wrist:
+      shape: *image_shape
+      type: rgb
+    qpos:
+      shape: [14]
+      type: low_dim
+  action:
+    shape: [14]
+
+env_runner:
+  _target_: diffusion_policy.env_runner.aloha_image_runner.AlohaImageRunner
+  shape_meta: *shape_meta
+  n_train: 0
+  n_train_vis: 0
+  train_start_seed: 0
+  n_test: 10
+  n_test_vis: 4
+  task_name: *name
+  test_start_seed: 100000
+  max_steps: 500
+  n_obs_steps: ${n_obs_steps}
+  n_action_steps: ${n_action_steps}
+  fps: 50
+  past_action: ${past_action_visible}
+  n_envs: null
+
+dataset:
+  _target_: *dataset_target
+  shape_meta: *shape_meta
+  dataset_dir: *dataset_dir
+  horizon: ${horizon}
+  pad_before: ${eval:'${n_obs_steps}-1+${n_latency_steps}'}
+  pad_after: ${eval:'${n_action_steps}-1'}
+  n_obs_steps: ${dataset_obs_steps}
+  use_cache: False
+  seed: 42
+  val_ratio: 0.2
+  max_train_episodes: null
+  camera_names: ["cam_high", "cam_low", "cam_left_wrist", "cam_right_wrist"]
+  task: *name

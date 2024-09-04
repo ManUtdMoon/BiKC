@@ -1,0 +1,26 @@
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.pyzw
+*.pycachefile
+*.pyproj
+*.pydevproject
+*.bak
+*.swp
+
+# common dirs
+.idea/
+.vscode/
+node_modules/
+bower_components/
+dist/
+build/
+target/
+out/
+logs/
+logs-*
+*.log
+/data/
